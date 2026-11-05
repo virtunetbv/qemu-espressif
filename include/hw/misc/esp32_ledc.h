@@ -17,6 +17,11 @@ typedef struct Esp32LEDCState {
     uint32_t timer_conf_reg[ESP32_LEDC_TIMER_CNT];
     uint32_t channel_conf0_reg[ESP32_LEDC_CHANNEL_CNT];
     LEDState led[ESP32_LEDC_CHANNEL_CNT];
+    /* Exact duty cycle in percent per channel (0..100), for the EVCS bridge. */
+    double duty_percent[ESP32_LEDC_CHANNEL_CNT];
+    uint32_t duty_raw[ESP32_LEDC_CHANNEL_CNT];
+    /* Register mirror so firmware read-back (e.g. DUTY_R) sees what it wrote. */
+    uint32_t regs[0x200 / 4];
 } Esp32LEDCState;
 
 REG32(LEDC_CONF_REG, 0x190)

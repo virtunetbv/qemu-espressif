@@ -25,6 +25,7 @@
 #include "hw/i2c/i2c.h"
 #include "hw/qdev-properties.h"
 #include "hw/xtensa/esp32.h"
+#include "hw/xtensa/esp32_evcs_bridge.h"
 #include "hw/misc/ssi_psram.h"
 #include "hw/sd/dwc_sdmmc.h"
 #include "core-esp32/core-isa.h"
@@ -955,6 +956,8 @@ static void esp32_machine_init(MachineState *machine)
     esp32_machine_init_openeth(ss);
 
     esp32_machine_init_sd(ss);
+
+    esp32_evcs_bridge_init(ss);
 
     /* Need MMU initialized prior to ELF loading,
      * so that ELF gets loaded into virtual addresses
