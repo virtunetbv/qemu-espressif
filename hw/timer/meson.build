@@ -37,6 +37,55 @@ system_ss.add(when: 'CONFIG_RISCV_ESP32C3', if_true: files(
     'esp_systimer.c',
     'esp32c3_systimer.c'
 ))
+system_ss.add(when: 'CONFIG_RISCV_ESP32C5', if_true: files(
+    'esp_timg.c',
+    'esp32c3_timg.c',
+    'esp32c5_timg.c',
+    'esp_systimer.c',
+    'esp32c3_systimer.c',
+    'esp32c5_systimer.c',
+))
+
+system_ss.add(when: 'CONFIG_RISCV_ESP32H4', if_true: files(
+  'esp_timg.c',
+  'esp32c3_timg.c',
+  'esp32h4_timg.c',
+  'esp_systimer.c',
+  'esp32c3_systimer.c',
+  'esp32h4_systimer.c',
+))
+system_ss.add(when: 'CONFIG_RISCV_ESP32C61', if_true: files(
+    'esp_timg.c',
+    'esp32c3_timg.c',
+    'esp32c61_timg.c',
+    'esp_systimer.c',
+    'esp32c3_systimer.c',
+    'esp32c61_systimer.c',
+))
+system_ss.add(when: 'CONFIG_RISCV_ESP32P4', if_true: files(
+    'esp_timg.c',
+    'esp32c3_timg.c',
+    'esp32p4_timg.c',
+    'esp_systimer.c',
+    'esp32c3_systimer.c',
+    'esp32p4_systimer.c',
+))
+system_ss.add(when: 'CONFIG_RISCV_ESP32C6', if_true: files(
+    'esp_timg.c',
+    'esp32c3_timg.c',
+    'esp32c6_timg.c',
+    'esp_systimer.c',
+    'esp32c3_systimer.c',
+    'esp32c6_systimer.c',
+))
+system_ss.add(when: 'CONFIG_RISCV_ESP32H2', if_true: files(
+    'esp_timg.c',
+    'esp32c3_timg.c',
+    'esp32h2_timg.c',
+    'esp_systimer.c',
+    'esp32c3_systimer.c',
+    'esp32h2_systimer.c',
+))
 system_ss.add(when: 'CONFIG_XTENSA_ESP32S3', if_true: files(
     'esp_timg.c',
     'esp32s3_timg.c',
