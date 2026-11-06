@@ -87,7 +87,8 @@ jobs:
             run_configure: "./.github/workflows/scripts/configure-macos.sh"
 
           - platform: aarch64-apple-darwin
-            runs_on: macos-15-xlarge
+            # Standard arm64 runner; the -xlarge larger runner is not available to this fork.
+            runs_on: macos-15
             shell: bash -e {0}
             run_prerequisites: "./.github/workflows/scripts/prerequisites-macos.sh"
             run_configure: "./.github/workflows/scripts/configure-macos.sh"
