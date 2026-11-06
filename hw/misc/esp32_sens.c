@@ -17,6 +17,8 @@ enum {
 #define SENS_MEAS1_START_SAR      BIT(17)
 #define SENS_MEAS1_DONE_SAR       BIT(16)
 #define SENS_MEAS1_DATA_MASK      0x0000ffffu
+#define SENS_SAR_EN_PAD_SHIFT     19
+#define SENS_SAR_EN_PAD_MASK      0xfffu
 
 /* SENS_SAR_MEAS_START2_REG (DR_REG_SENS_BASE + 0x94) */
 #define SENS_SAR_MEAS_START2      0x94
@@ -32,6 +34,50 @@ static bool esp32_sens_debug_enabled(void)
         enabled = getenv("ESP32_SENS_DEBUG") != NULL;
     }
     return enabled;
+}
+
+void esp32_sens_set_adc_value(Esp32SensState *s, int unit, int channel, uint16_t value)
+{
+    if (channel < 0 || channel >= ESP32_SENS_ADC_CHANNELS) {
+        return;
+    }
+    if (value > 0xfff) {
+        value = 0xfff;
+    }
+    if (unit == 1) {
+        s->adc1_value[channel] = value;
+    } else if (unit == 2) {
+        s->adc2_value[channel] = value;
+    }
+}
+
+/* Channel selected by the one-hot SARx_EN_PAD field of a MEAS_STARTx write. */
+static int esp32_sens_pad_channel(uint32_t reg)
+{
+    uint32_t pad = (reg >> SENS_SAR_EN_PAD_SHIFT) & SENS_SAR_EN_PAD_MASK;
+    if (pad == 0) {
+        return -1;
+    }
+    return ctz32(pad);
+}
+
+static uint16_t esp32_sens_sample(Esp32SensState *s, int unit, uint32_t reg)
+{
+    int ch = esp32_sens_pad_channel(reg);
+    uint16_t v = 0x0800u;
+    if (ch >= 0 && ch < ESP32_SENS_ADC_CHANNELS) {
+        if (unit == 1) {
+            v = s->adc1_value[ch];
+            s->adc1_reads[ch]++;
+        } else {
+            v = s->adc2_value[ch];
+            s->adc2_reads[ch]++;
+        }
+    }
+    if (esp32_sens_debug_enabled()) {
+        printf("esp32_sens: adc%d ch%d -> %u\n", unit, ch, v);
+    }
+    return v;
 }
 
 static uint64_t esp32_sens_read(void *opaque, hwaddr addr, unsigned int size)
@@ -78,8 +124,8 @@ static void esp32_sens_write(void *opaque, hwaddr addr, uint64_t value, unsigned
             reg &= ~SENS_MEAS1_START_SAR; /* self-clearing */
             reg &= ~SENS_MEAS1_DONE_SAR;
 
-            /* Deterministic mid-scale sample (12-bit in practice). */
-            reg = (reg & ~SENS_MEAS1_DATA_MASK) | 0x0800u;
+            /* Per-channel injected sample (12-bit), mid-scale by default. */
+            reg = (reg & ~SENS_MEAS1_DATA_MASK) | esp32_sens_sample(s, 1, reg);
             reg |= SENS_MEAS1_DONE_SAR;
         }
 
@@ -100,8 +146,8 @@ static void esp32_sens_write(void *opaque, hwaddr addr, uint64_t value, unsigned
             reg &= ~SENS_MEAS2_START_SAR; /* self-clearing */
             reg &= ~SENS_MEAS2_DONE_SAR;
 
-            /* Deterministic mid-scale sample (12-bit in practice). */
-            reg = (reg & ~SENS_MEAS2_DATA_MASK) | 0x0800u;
+            /* Per-channel injected sample (12-bit), mid-scale by default. */
+            reg = (reg & ~SENS_MEAS2_DATA_MASK) | esp32_sens_sample(s, 2, reg);
             reg |= SENS_MEAS2_DONE_SAR;
         }
 
@@ -129,6 +175,10 @@ static void esp32_sens_init(Object *obj)
     sysbus_init_mmio(sbd, &s->iomem);
 
     memset(s->mem, 0, sizeof(s->mem));
+    for (int i = 0; i < ESP32_SENS_ADC_CHANNELS; i++) {
+        s->adc1_value[i] = 0x0800u;
+        s->adc2_value[i] = 0x0800u;
+    }
 }
 
 static const TypeInfo esp32_sens_info = {

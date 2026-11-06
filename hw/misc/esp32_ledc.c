@@ -9,7 +9,12 @@
 static uint64_t esp32_ledc_read(void *opaque, hwaddr addr, unsigned int size)
 {
     Esp32LEDCState *s = ESP32_LEDC(opaque);
-    uint64_t r = 0;
+    uint64_t r = addr < sizeof(s->regs) ? s->regs[addr / 4] : 0;
+    if (addr < A_LEDC_HSTIMER0_CONF_REG &&
+        (addr % 0x14) == 0x10) {
+        /* CHn_DUTY_R: current duty, same format as CHn_DUTY (4 fraction bits). */
+        r = s->regs[(addr - 0x8) / 4] & 0x1ffffff;
+    }
     switch (addr) {
     case A_LEDC_HSTIMER0_CONF_REG ... A_LEDC_LSTIMER3_CONF_REG:
         r = s->timer_conf_reg[(addr - A_LEDC_HSTIMER0_CONF_REG) / 0x8];
@@ -55,6 +60,21 @@ static void esp32_ledc_write(void *opaque, hwaddr addr,
                             uint64_t value, unsigned int size)
 {
     Esp32LEDCState *s = ESP32_LEDC(opaque);
+    if (addr < sizeof(s->regs)) {
+        uint32_t v = (uint32_t)value;
+        if (addr < A_LEDC_HSTIMER0_CONF_REG) {
+            const unsigned off = addr % 0x14;
+            if (off == 0xc) {
+                v &= ~BIT(31);      /* CHn_CONF1.DUTY_START: applied at once, self-clears */
+            } else if (off == 0x0 && addr >= A_LEDC_LSCH0_CONF0_REG) {
+                v &= ~BIT(4);       /* LSCHn_CONF0.PARA_UP self-clears */
+            }
+        } else if (addr >= A_LEDC_LSTIMER0_CONF_REG && addr <= A_LEDC_LSTIMER3_CONF_REG &&
+                   ((addr - A_LEDC_LSTIMER0_CONF_REG) % 8) == 0) {
+            v &= ~BIT(26);          /* LSTIMERn_CONF.PARA_UP self-clears */
+        }
+        s->regs[addr / 4] = v;
+    }
     switch (addr) {
     case A_LEDC_HSTIMER0_CONF_REG ... A_LEDC_LSTIMER3_CONF_REG:
         /* get duty resolution from timer config */
@@ -99,8 +119,21 @@ static void esp32_ledc_write(void *opaque, hwaddr addr,
     case A_LEDC_LSCH5_DUTY_REG:
     case A_LEDC_LSCH6_DUTY_REG:
     case A_LEDC_LSCH7_DUTY_REG:
-        led_set_intensity(&s->led[(addr - A_LEDC_HSCH0_DUTY_REG) / 0x14], esp32_ledc_get_percent(s, value, addr));
+    {
+        const unsigned ch = (addr - A_LEDC_HSCH0_DUTY_REG) / 0x14;
+        const uint32_t timer = (s->channel_conf0_reg[ch] & 0x3) + (ch < 8 ? 0 : 4);
+        const uint32_t res = s->duty_res[timer];
+        const uint32_t duty_val = ((uint32_t)value >> 4) & ((1u << 20) - 1);
+        s->duty_raw[ch] = duty_val;
+        if (res) {
+            double pct = 100.0 * (double)duty_val / (double)(1u << res);
+            s->duty_percent[ch] = pct > 100.0 ? 100.0 : pct;
+        } else {
+            s->duty_percent[ch] = 0.0;
+        }
+        led_set_intensity(&s->led[ch], esp32_ledc_get_percent(s, value, addr));
         break;
+    }
     }
 
 }
